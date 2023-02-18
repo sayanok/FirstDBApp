@@ -3,7 +3,6 @@ class Customer {
   dbName: string;
   constructor(dbName: string) {
     this.dbName = dbName;
-    this.removeAllRows = this.removeAllRows.bind(this); // これよくわからない
     if (!window.indexedDB) {
       window.alert(
         "Your browser doesn't support a stable version of IndexedDB. \
@@ -12,7 +11,7 @@ class Customer {
     }
   }
 
-  removeAllRows() {
+  removeAllRows(callback?: () => void) {
     console.log("removeAllRows");
     const request = indexedDB.open(this.dbName, 1);
 
@@ -37,6 +36,7 @@ class Customer {
       };
       txn.oncomplete = (event) => {
         console.log("All rows removed!");
+        callback?.();
       };
       const objectStore = txn.objectStore("customers");
       const getAllKeysRequest = objectStore.getAllKeys();
@@ -48,7 +48,7 @@ class Customer {
     };
   }
 
-  initialLoad(customerData: Array<{ userid: string; name: string; email: string }>) {
+  initialLoad(customerData: Array<{ userid: string; name: string; email: string }>, callback?: () => void) {
     console.log("initialLoad");
     // DBを開く
     const request = indexedDB.open(this.dbName, 1);
@@ -68,11 +68,6 @@ class Customer {
         // DB内にオブジェクトストアを作成する
         const objectStore = db.createObjectStore("customers", { keyPath: "userid" });
 
-        // objectStore.onerror = (event) => {
-        //   console.log("initialLoad - objectStore error: ", event.target.error.code, " - ", event.target.error.message);
-        // };
-        // ※※※onerrorメソッド存在しないって言われる、一旦コメントアウト※※※
-
         // データベース操作のトランザクションを開始して、リクエストを行う
         // Create an index to search customers by name and email
         objectStore.createIndex("name", "name", { unique: false });
@@ -85,7 +80,8 @@ class Customer {
             customerObjectStore.put(customer);
           });
         };
-        console.log("処理終了");
+        console.log("DB作成およびデータ登録完了");
+        callback?.();
       } else {
         console.log("event.targetがnullだよ");
       }
@@ -99,6 +95,7 @@ class Customer {
       });
       db.close();
       console.log("データ登録完了");
+      callback?.();
     };
   }
 
@@ -131,8 +128,6 @@ class Customer {
       };
     };
   }
-
-  getSpecificRow() {}
 }
 
 const App: React.FC = () => {
@@ -148,12 +143,13 @@ const App: React.FC = () => {
   const clearDB = () => {
     logHandler("実行内容: clearDB");
     logHandler("clearDB: データ削除開始");
-    setStatusMessage("データ削除開始");
-    customer.removeAllRows();
-    setStatusMessage("データ削除完了");
-    setStatusMessage("データ削除完了");
-
-    queryDB();
+    setStatusMessage("データの削除を開始します");
+    customer.removeAllRows(() => {
+      setStatusMessage("データの削除が完了しました");
+    });
+    customer.getAllRows((customers) => {
+      setCustomerData(customers);
+    });
   };
 
   /**
@@ -162,16 +158,16 @@ const App: React.FC = () => {
   const loadDB = () => {
     logHandler("実行内容: loadDB");
     logHandler("loadDB: ロード開始");
-
-    setStatusMessage("ロード開始"); //これ機能してない
+    setStatusMessage("ロードを開始します");
 
     // Customers to add to initially populate the database with
     const customerData = [
       { userid: "444", name: "Bill", email: "bill@company.com" },
       { userid: "555", name: "Donna", email: "donna@home.org" },
     ];
-    customer.initialLoad(customerData);
-    setStatusMessage("ロード終了");
+    customer.initialLoad(customerData, () => {
+      setStatusMessage("ロードが終了しました");
+    });
     logHandler("loadDB: ロード終了");
   };
 
@@ -179,9 +175,11 @@ const App: React.FC = () => {
     logHandler("実行内容: queryDB");
     logHandler("queryDB: データを取得しています");
     setStatusMessage("データを取得しています");
-    customer.getAllRows(setCustomerData);
-    setStatusMessage("データの取得が完了しました");
-    logHandler("queryDB: データの取得が完了しました");
+    customer.getAllRows((customers) => {
+      setCustomerData(customers);
+      setStatusMessage("データの取得が完了しました");
+      logHandler("queryDB: データの取得が完了しました");
+    });
   };
 
   const logHandler = (message: string) => {
@@ -238,19 +236,19 @@ export default App;
 //　→クリア操作の開始時と終了時も
 
 // ログパネル
-// →通知パネルの履歴を表示する ok
-//　→実行内容(DBのロードとかの履歴を表示する) ok
+// →通知パネルの履歴を表示する
+//　→実行内容(DBのロードとかの履歴を表示する)
 
 // クエリ結果領域
-//　→表示する行がないとき、その旨がメッセージとして表示される ok
-//　→ユーザーの詳細情報を表示する ok
-//　→スクロール可能である ok
+//　→表示する行がないとき、その旨がメッセージとして表示される
+//　→ユーザーの詳細情報を表示する
+//　→スクロール可能である
 
 // LoadDBボタン
-//　データを入力できる ok
+//　データを入力できる
 
 // QueryDBボタン
-// →クエリ結果領域にすべての顧客の一覧を表示できる　ok
+// →クエリ結果領域にすべての顧客の一覧を表示できる
 
 // ClearDBボタン
-// →DBからすべての行を削除できる ok
+// →DBからすべての行を削除できる
