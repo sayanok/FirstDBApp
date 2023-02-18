@@ -3,7 +3,6 @@ class Customer {
   dbName: string;
   constructor(dbName: string) {
     this.dbName = dbName;
-    console.log("constructor");
     this.removeAllRows = this.removeAllRows.bind(this); // これよくわからない
     if (!window.indexedDB) {
       window.alert(
@@ -87,19 +86,19 @@ class Customer {
           });
         };
         console.log("処理終了");
-        // db.close();
-        // ※※※ここでcloseするとデータを登録することができない※※※
-        // ※※※しかし、参考にはここでDBをcloseしている※※※
-        // ※※※どこでDBをcloseすべきか？closeは本当に必要か※※※
       } else {
         console.log("event.targetがnullだよ");
       }
     };
 
     request.onsuccess = (event) => {
-      console.log("成功");
-      // ここにデータを登録するソースコードが必要？
-      // データを削除したあとに"loadDB"ボタンをクリックしても、データを登録することができていない
+      const db = (event.target as IDBOpenDBRequest).result;
+      const customerObjectStore = db.transaction(["customers"], "readwrite").objectStore("customers");
+      customerData.forEach(function (customer) {
+        customerObjectStore.put(customer);
+      });
+      db.close();
+      console.log("データ登録完了");
     };
   }
 
@@ -137,7 +136,8 @@ class Customer {
 }
 
 const App: React.FC = () => {
-  const DBNAME = "customer_dbk";
+  const DBNAME = "customer_dbm";
+  const [log, setLog] = useState<Array<string>>([]);
   const [statusMessage, setStatusMessage] = useState("");
   const [customerData, setCustomerData] = useState<Array<{ userid: number; name: string; email: string }>>();
   let customer = new Customer(DBNAME);
@@ -146,9 +146,13 @@ const App: React.FC = () => {
    * Clear all customer data from the database
    */
   const clearDB = () => {
-    console.log("Delete all rows from the Customers database");
-    setStatusMessage("Delete all rows from the Customers database");
+    logHandler("実行内容: clearDB");
+    logHandler("clearDB: データ削除開始");
+    setStatusMessage("データ削除開始");
     customer.removeAllRows();
+    setStatusMessage("データ削除完了");
+    setStatusMessage("データ削除完了");
+
     queryDB();
   };
 
@@ -156,8 +160,10 @@ const App: React.FC = () => {
    * Add customer data to the database
    */
   const loadDB = () => {
-    console.log("Load the Customers database");
-    setStatusMessage("Load the Customers database");
+    logHandler("実行内容: loadDB");
+    logHandler("loadDB: ロード開始");
+
+    setStatusMessage("ロード開始"); //これ機能してない
 
     // Customers to add to initially populate the database with
     const customerData = [
@@ -165,11 +171,22 @@ const App: React.FC = () => {
       { userid: "555", name: "Donna", email: "donna@home.org" },
     ];
     customer.initialLoad(customerData);
+    setStatusMessage("ロード終了");
+    logHandler("loadDB: ロード終了");
   };
 
   const queryDB = () => {
+    logHandler("実行内容: queryDB");
+    logHandler("queryDB: データを取得しています");
     setStatusMessage("データを取得しています");
     customer.getAllRows(setCustomerData);
+    setStatusMessage("データの取得が完了しました");
+    logHandler("queryDB: データの取得が完了しました");
+  };
+
+  const logHandler = (message: string) => {
+    log.push(message);
+    setLog(log);
   };
 
   return (
@@ -188,21 +205,27 @@ const App: React.FC = () => {
         <p>{statusMessage}</p>
       </div>
       <div>ログパネル</div>
-      {/* ユーザーは、ログ パネルで通知パネル メッセージの実行履歴を確認できます。 */}
-      {/* →実行内容の履歴を表示することとする */}
+      <div style={{ height: "200px", border: "1px solid #000", overflowY: "scroll" }}>
+        {log.map((log, index) => (
+          <p>{log}</p>
+        ))}
+      </div>
+
       <div>クエリ結果領域</div>
-      {customerData && customerData.length !== 0 ? (
-        customerData.map((customer, index) => (
-          <li style={{ listStyleType: "none" }}>
-            <ul>id：{customer.userid}</ul>
-            <ul>名前：{customer.name}</ul>
-            <ul>メアド：{customer.email}</ul>
-            <hr />
-          </li>
-        ))
-      ) : (
-        <p style={{ color: "red" }}>表示できるデータがありません</p>
-      )}
+      <div style={{ height: "200px", border: "1px solid #000", overflowY: "scroll" }}>
+        {customerData && customerData.length !== 0 ? (
+          customerData.map((customer, index) => (
+            <li style={{ listStyleType: "none" }}>
+              <ul>id：{customer.userid}</ul>
+              <ul>名前：{customer.name}</ul>
+              <ul>メアド：{customer.email}</ul>
+              <hr />
+            </li>
+          ))
+        ) : (
+          <p style={{ color: "red" }}>表示できるデータがありません</p>
+        )}
+      </div>
     </>
   );
 };
@@ -215,15 +238,16 @@ export default App;
 //　→クリア操作の開始時と終了時も
 
 // ログパネル
-// →通知パネルの履歴を表示する
-//　→実行内容(DBのロードとかの履歴を表示する)
+// →通知パネルの履歴を表示する ok
+//　→実行内容(DBのロードとかの履歴を表示する) ok
 
 // クエリ結果領域
 //　→表示する行がないとき、その旨がメッセージとして表示される ok
-//　→ユーザーの詳細情報を表示する
+//　→ユーザーの詳細情報を表示する ok
+//　→スクロール可能である ok
 
 // LoadDBボタン
-//　データを入力できる
+//　データを入力できる ok
 
 // QueryDBボタン
 // →クエリ結果領域にすべての顧客の一覧を表示できる　ok
